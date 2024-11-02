@@ -18,35 +18,48 @@ import org.bukkit.plugin.java.JavaPlugin;
  *
  * The plugin allows to have the enchantments of the 1.7.10 in the recent versions of minecraft.
  */
-public class OldEnchantPlugin extends JavaPlugin implements Listener {
+public class OldEnchantOG extends JavaPlugin implements Listener {
 
 	@Override
 	public void onEnable() {
+
 		Bukkit.getPluginManager().registerEvents(this, this);
+
 	}
 
 	@EventHandler
 	public void inventoryClick(InventoryClickEvent event) {
+
 		Inventory inventory = event.getInventory();
 		if (inventory.getType().equals(InventoryType.ENCHANTING) && event.getRawSlot() == 1) {
+
 			event.setCancelled(true);
+
 		}
+
 	}
 
 	@EventHandler
 	public void inventoryClose(InventoryCloseEvent event) {
+
 		Inventory inventory = event.getInventory();
 		if (inventory.getType().equals(InventoryType.ENCHANTING)) {
+
 			inventory.setItem(1, null);
+
 		}
+
 	}
 
 	@EventHandler
 	public void enchantItem(EnchantItemEvent event) {
+
 		int newLevel = event.getEnchanter().getLevel() - event.getExpLevelCost() + (event.whichButton() + 1);
 		newLevel = newLevel < 1 ? 1 : newLevel;
+
 		event.getEnchanter().setLevel(newLevel);
 		event.setExpLevelCost(1);
+
 	}
 
 	/*MIT License
@@ -73,12 +86,18 @@ public class OldEnchantPlugin extends JavaPlugin implements Listener {
 	// Prevent "too expensive" message in anvils. From BySwiizen/TooExpensiveFix.
 	@EventHandler
 	public void onAnvil(PrepareAnvilEvent event) {
+
 		event.getInventory().setMaximumRepairCost(21862);
 		if (event.getInventory().getItem(2) != null) {
+
 			if (event.getInventory().getItem(0).getDisplayName() != event.getInventory().getItem(2).getDisplayName() && event.getInventory().getItem(1) == null) {
+
 				event.getInventory().setMaximumRepairCost(1);
+
 			}
+
 		}
+
 	}
 
 }

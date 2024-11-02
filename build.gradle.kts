@@ -2,7 +2,6 @@ plugins {
     java // Tell gradle this is a java project.
     id("io.github.goooler.shadow") version "8.1.8"
     eclipse // Import eclipse plugin for IDE integration.
-    kotlin("jvm") version "1.9.23" // Import kotlin jvm plugin for kotlin/java integration.
 }
 
 java {
@@ -36,8 +35,12 @@ repositories {
 }
 
 dependencies {
-    compileOnly("org.purpurmc.purpur:purpur-api:1.19.4-R0.1-SNAPSHOT") // Declare purpur API version to be packaged.
-    compileOnly("io.github.miniplaceholders:miniplaceholders-api:2.2.3") // Import MiniPlaceholders API.
+    compileOnly("org.purpurmc.purpur:purpur-api:1.19.4-R0.1-SNAPSHOT")
+    compileOnly("io.github.miniplaceholders:miniplaceholders-api:2.2.3")
+    
+    implementation("com.github.cryptomorin:XSeries:8.6.1")
+    
+    testImplementation("junit:junit:3.8.1")
 }
 
 tasks.withType<AbstractArchiveTask>().configureEach {
@@ -46,7 +49,28 @@ tasks.withType<AbstractArchiveTask>().configureEach {
 }
 
 tasks.shadowJar {
-    exclude("io.github.miniplaceholders.*") // Exclude the MiniPlaceholders package from being shadowed.
+    archiveClassifier.set("")
+
+    relocate("com.cryptomorin.xseries", "my.plugin.utils")
+
+    exclude("com/cryptomorin/xseries/XBiome*")
+    exclude("com/cryptomorin/xseries/XBlock*")
+    exclude("com/cryptomorin/xseries/XEnchantment*")
+    exclude("com/cryptomorin/xseries/XEntity*")
+    exclude("com/cryptomorin/xseries/XItemStack*")
+    exclude("com/cryptomorin/xseries/XPotion*")
+    exclude("com/cryptomorin/xseries/XSound*")
+    exclude("com/cryptomorin/xseries/XTag*")
+    exclude("com/cryptomorin/xseries/messages/**")
+    exclude("com/cryptomorin/xseries/particles/**")
+    exclude("com/cryptomorin/xseries/SkullUtils*")
+    exclude("com/cryptomorin/xseries/NMSExtras*")
+    exclude("com/cryptomorin/xseries/ReflectionUtils*")
+    exclude("com/cryptomorin/xseries/NoteBlockMusic*")
+    exclude("com/cryptomorin/xseries/SkullCacheListener*")
+    
+    exclude("io/github/miniplaceholders/**")
+
     minimize()
 }
 
@@ -70,10 +94,6 @@ tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.add("-parameters")
     options.encoding = "UTF-8"
     options.isFork = true
-}
-
-kotlin {
-    jvmToolchain(17)
 }
 
 java {

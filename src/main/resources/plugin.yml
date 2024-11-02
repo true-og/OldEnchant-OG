@@ -1,7 +1,6 @@
 name: OldEnchant-OG
 authors: [NotAlexNoyle, Maxlego08]
-main: net.trueog.oldenchantog.OldEnchantPlugin
+main: net.trueog.oldenchantog.OldEnchantOG
 version: '${version}'
 website: https://true-og.net
 api-version: 1.19
-commands:
