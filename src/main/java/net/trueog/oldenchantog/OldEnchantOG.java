@@ -130,7 +130,9 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
         }
 
         EnchantingInventory enchantingInventory = (EnchantingInventory) inventory;
-        if (!isLapis(enchantingInventory.getSecondary()) || enchantingInventory.getSecondary().getAmount() != AUTO_LAPIS_AMOUNT) {
+        if (!isLapis(enchantingInventory.getSecondary())
+                || enchantingInventory.getSecondary().getAmount() != AUTO_LAPIS_AMOUNT)
+        {
 
             enchantingInventory.setSecondary(getLapis());
 

@@ -8,5 +8,6 @@ A fork of [zOldEnchant](https://github.com/Maxlego08/zOldEnchant), which allows 
 
 - Updated for 1.19.4.
 - Switched from maven to gradle.
+- Added automatic lapis module adapted from old OldCombatMechanics versions, licensed under MPLv2.
 
-Licensed under MIT.
+The rest of the plugin is licensed under MIT.
