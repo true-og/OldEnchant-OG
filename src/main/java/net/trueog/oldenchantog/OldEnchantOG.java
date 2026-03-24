@@ -5,11 +5,18 @@
  */
 package net.trueog.oldenchantog;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
+
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.entity.HumanEntity;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.enchantment.EnchantItemEvent;
+import org.bukkit.event.enchantment.PrepareItemEnchantEvent;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -17,7 +24,6 @@ import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.inventory.InventoryType;
-import org.bukkit.event.enchantment.PrepareItemEnchantEvent;
 import org.bukkit.event.inventory.PrepareAnvilEvent;
 import org.bukkit.inventory.EnchantingInventory;
 import org.bukkit.inventory.Inventory;
@@ -34,7 +40,9 @@ import org.bukkit.plugin.java.JavaPlugin;
 public class OldEnchantOG extends JavaPlugin implements Listener {
 
     private static final int ENCHANTING_LAPIS_SLOT = 1;
+    private static final int ENCHANTING_ITEM_SLOT = 0;
     private static final int AUTO_LAPIS_AMOUNT = 64;
+    private final Map<UUID, Boolean> hadEnchantingItem = new HashMap<>();
 
     @Override
     public void onEnable() {
@@ -46,7 +54,9 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
     @EventHandler
     public void inventoryOpen(InventoryOpenEvent event) {
 
-        fillUpEnchantingTable(event.getInventory());
+        Inventory inventory = event.getInventory();
+        fillUpEnchantingTable(inventory);
+        trackEnchantingItem(event.getPlayer(), inventory);
 
     }
 
@@ -75,6 +85,7 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
         }
 
         refillEnchantingTableNextTick(inventory);
+        updateEnchantingStateNextTick(event.getWhoClicked(), inventory);
 
     }
 
@@ -95,6 +106,7 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
         }
 
         refillEnchantingTableNextTick(inventory);
+        updateEnchantingStateNextTick(event.getWhoClicked(), inventory);
 
     }
 
@@ -105,6 +117,7 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
         if (inventory.getType().equals(InventoryType.ENCHANTING)) {
 
             ((EnchantingInventory) inventory).setSecondary(null);
+            hadEnchantingItem.remove(event.getPlayer().getUniqueId());
 
         }
 
@@ -152,6 +165,48 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
     private void refillEnchantingTableNextTick(Inventory inventory) {
 
         Bukkit.getScheduler().runTask(this, () -> fillUpEnchantingTable(inventory));
+
+    }
+
+    private void trackEnchantingItem(HumanEntity humanEntity, Inventory inventory) {
+
+        if (inventory == null || inventory.getType() != InventoryType.ENCHANTING) {
+
+            return;
+
+        }
+
+        ItemStack primary = ((EnchantingInventory) inventory).getItem(ENCHANTING_ITEM_SLOT);
+        hadEnchantingItem.put(humanEntity.getUniqueId(), primary != null && primary.getType() != Material.AIR);
+
+    }
+
+    private void updateEnchantingStateNextTick(HumanEntity humanEntity, Inventory inventory) {
+
+        Bukkit.getScheduler().runTask(this, () -> updateEnchantingState(humanEntity, inventory));
+
+    }
+
+    private void updateEnchantingState(HumanEntity humanEntity, Inventory inventory) {
+
+        if (inventory == null || inventory.getType() != InventoryType.ENCHANTING) {
+
+            hadEnchantingItem.remove(humanEntity.getUniqueId());
+            return;
+
+        }
+
+        ItemStack primary = ((EnchantingInventory) inventory).getItem(ENCHANTING_ITEM_SLOT);
+        boolean hasPrimary = primary != null && primary.getType() != Material.AIR;
+        boolean hadPrimary = hadEnchantingItem.getOrDefault(humanEntity.getUniqueId(), false);
+
+        if (!hadPrimary && hasPrimary) {
+
+            humanEntity.setEnchantmentSeed(ThreadLocalRandom.current().nextInt());
+
+        }
+
+        hadEnchantingItem.put(humanEntity.getUniqueId(), hasPrimary);
 
     }
 
