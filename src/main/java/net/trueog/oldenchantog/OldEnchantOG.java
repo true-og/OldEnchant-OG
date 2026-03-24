@@ -17,6 +17,7 @@ import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.enchantment.PrepareItemEnchantEvent;
 import org.bukkit.event.inventory.PrepareAnvilEvent;
 import org.bukkit.inventory.EnchantingInventory;
 import org.bukkit.inventory.Inventory;
@@ -110,13 +111,21 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
     }
 
     @EventHandler
+    public void prepareEnchant(PrepareItemEnchantEvent event) {
+
+        int[] offeredCosts = event.getExpLevelCostsOffered();
+        for (int i = 0; i < offeredCosts.length; i++) {
+
+            offeredCosts[i] = i + 1;
+
+        }
+
+    }
+
+    @EventHandler
     public void enchantItem(EnchantItemEvent event) {
 
-        int newLevel = event.getEnchanter().getLevel() - event.getExpLevelCost() + (event.whichButton() + 1);
-        newLevel = newLevel < 1 ? 1 : newLevel;
-
-        event.getEnchanter().setLevel(newLevel);
-        event.setExpLevelCost(1);
+        event.setExpLevelCost(event.whichButton() + 1);
         ((EnchantingInventory) event.getInventory()).setSecondary(getLapis());
 
     }
