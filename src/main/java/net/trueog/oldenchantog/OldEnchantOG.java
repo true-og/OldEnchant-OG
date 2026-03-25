@@ -42,7 +42,7 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
     private static final int ENCHANTING_LAPIS_SLOT = 1;
     private static final int ENCHANTING_ITEM_SLOT = 0;
     private static final int AUTO_LAPIS_AMOUNT = 64;
-    private final Map<UUID, Boolean> hadEnchantingItem = new HashMap<>();
+    private final Map<UUID, ItemStack> trackedEnchantingItems = new HashMap<>();
 
     @Override
     public void onEnable() {
@@ -117,7 +117,7 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
         if (inventory.getType().equals(InventoryType.ENCHANTING)) {
 
             ((EnchantingInventory) inventory).setSecondary(null);
-            hadEnchantingItem.remove(event.getPlayer().getUniqueId());
+            trackedEnchantingItems.remove(event.getPlayer().getUniqueId());
 
         }
 
@@ -177,7 +177,7 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
         }
 
         ItemStack primary = ((EnchantingInventory) inventory).getItem(ENCHANTING_ITEM_SLOT);
-        hadEnchantingItem.put(humanEntity.getUniqueId(), primary != null && primary.getType() != Material.AIR);
+        trackedEnchantingItems.put(humanEntity.getUniqueId(), cloneOrNull(primary));
 
     }
 
@@ -191,22 +191,22 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
 
         if (inventory == null || inventory.getType() != InventoryType.ENCHANTING) {
 
-            hadEnchantingItem.remove(humanEntity.getUniqueId());
+            trackedEnchantingItems.remove(humanEntity.getUniqueId());
             return;
 
         }
 
         ItemStack primary = ((EnchantingInventory) inventory).getItem(ENCHANTING_ITEM_SLOT);
-        boolean hasPrimary = primary != null && primary.getType() != Material.AIR;
-        boolean hadPrimary = hadEnchantingItem.getOrDefault(humanEntity.getUniqueId(), false);
+        ItemStack previousPrimary = trackedEnchantingItems.get(humanEntity.getUniqueId());
+        ItemStack currentPrimary = cloneOrNull(primary);
 
-        if (!hadPrimary && hasPrimary) {
+        if (!sameItem(previousPrimary, currentPrimary) && isEnchantable(currentPrimary)) {
 
             humanEntity.setEnchantmentSeed(ThreadLocalRandom.current().nextInt());
 
         }
 
-        hadEnchantingItem.put(humanEntity.getUniqueId(), hasPrimary);
+        trackedEnchantingItems.put(humanEntity.getUniqueId(), currentPrimary);
 
     }
 
@@ -219,6 +219,52 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
     private boolean isLapis(ItemStack item) {
 
         return item != null && item.getType() == Material.LAPIS_LAZULI;
+
+    }
+
+    private ItemStack cloneOrNull(ItemStack item) {
+
+        if (item == null || item.getType() == Material.AIR) {
+
+            return null;
+
+        }
+
+        return item.clone();
+
+    }
+
+    private boolean sameItem(ItemStack first, ItemStack second) {
+
+        if (first == null || second == null) {
+
+            return first == second;
+
+        }
+
+        return first.equals(second);
+
+    }
+
+    private boolean isEnchantable(ItemStack item) {
+
+        if (item == null || item.getType() == Material.AIR) {
+
+            return false;
+
+        }
+
+        for (org.bukkit.enchantments.Enchantment enchantment : org.bukkit.enchantments.Enchantment.values()) {
+
+            if (enchantment.canEnchantItem(item)) {
+
+                return true;
+
+            }
+
+        }
+
+        return false;
 
     }
 
