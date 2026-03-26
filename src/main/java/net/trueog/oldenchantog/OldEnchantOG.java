@@ -5,13 +5,11 @@
  */
 package net.trueog.oldenchantog;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.enchantments.EnchantmentOffer;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -42,7 +40,6 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
     private static final int ENCHANTING_LAPIS_SLOT = 1;
     private static final int ENCHANTING_ITEM_SLOT = 0;
     private static final int AUTO_LAPIS_AMOUNT = 64;
-    private final Map<UUID, ItemStack> trackedEnchantingItems = new HashMap<>();
 
     @Override
     public void onEnable() {
@@ -54,21 +51,23 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
     @EventHandler
     public void inventoryOpen(InventoryOpenEvent event) {
 
-        Inventory inventory = event.getInventory();
+        final Inventory inventory = event.getInventory();
+
         fillUpEnchantingTable(inventory);
-        trackEnchantingItem(event.getPlayer(), inventory);
 
     }
 
     @EventHandler
     public void inventoryClick(InventoryClickEvent event) {
 
-        Inventory inventory = event.getInventory();
-        if (!inventory.getType().equals(InventoryType.ENCHANTING)) {
+        final Inventory inventory = event.getInventory();
+        if (inventory.getType() != InventoryType.ENCHANTING) {
 
             return;
 
         }
+
+        refreshEnchantingOffersIfNeeded(event);
 
         if (event.getRawSlot() == ENCHANTING_LAPIS_SLOT) {
 
@@ -85,19 +84,20 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
         }
 
         refillEnchantingTableNextTick(inventory);
-        updateEnchantingStateNextTick(event.getWhoClicked(), inventory);
 
     }
 
     @EventHandler
     public void inventoryDrag(InventoryDragEvent event) {
 
-        Inventory inventory = event.getInventory();
-        if (!inventory.getType().equals(InventoryType.ENCHANTING)) {
+        final Inventory inventory = event.getInventory();
+        if (inventory.getType() != InventoryType.ENCHANTING) {
 
             return;
 
         }
+
+        refreshEnchantingOffersIfNeeded(event);
 
         if (event.getRawSlots().contains(ENCHANTING_LAPIS_SLOT) || isLapis(event.getOldCursor())) {
 
@@ -106,18 +106,16 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
         }
 
         refillEnchantingTableNextTick(inventory);
-        updateEnchantingStateNextTick(event.getWhoClicked(), inventory);
 
     }
 
     @EventHandler
     public void inventoryClose(InventoryCloseEvent event) {
 
-        Inventory inventory = event.getInventory();
-        if (inventory.getType().equals(InventoryType.ENCHANTING)) {
+        final Inventory inventory = event.getInventory();
+        if (inventory.getType() == InventoryType.ENCHANTING) {
 
             ((EnchantingInventory) inventory).setSecondary(null);
-            trackedEnchantingItems.remove(event.getPlayer().getUniqueId());
 
         }
 
@@ -126,10 +124,15 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
     @EventHandler
     public void prepareEnchant(PrepareItemEnchantEvent event) {
 
-        int[] offeredCosts = event.getExpLevelCostsOffered();
-        for (int i = 0; i < offeredCosts.length; i++) {
+        final EnchantmentOffer[] offers = event.getOffers();
+        for (int i = 0; i < offers.length; i++) {
 
-            offeredCosts[i] = i + 1;
+            final EnchantmentOffer offer = offers[i];
+            if (offer != null) {
+
+                offer.setCost(i + 1);
+
+            }
 
         }
 
@@ -139,6 +142,7 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
     public void enchantItem(EnchantItemEvent event) {
 
         event.setExpLevelCost(event.whichButton() + 1);
+
         ((EnchantingInventory) event.getInventory()).setSecondary(getLapis());
 
     }
@@ -151,7 +155,7 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
 
         }
 
-        EnchantingInventory enchantingInventory = (EnchantingInventory) inventory;
+        final EnchantingInventory enchantingInventory = (EnchantingInventory) inventory;
         if (!isLapis(enchantingInventory.getSecondary())
                 || enchantingInventory.getSecondary().getAmount() != AUTO_LAPIS_AMOUNT)
         {
@@ -168,45 +172,37 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
 
     }
 
-    private void trackEnchantingItem(HumanEntity humanEntity, Inventory inventory) {
+    private void refreshEnchantingOffersIfNeeded(InventoryClickEvent event) {
 
-        if (inventory == null || inventory.getType() != InventoryType.ENCHANTING) {
+        if (event.getRawSlot() == ENCHANTING_ITEM_SLOT) {
+
+            shuffleEnchantingOffers(event.getWhoClicked());
 
             return;
 
         }
 
-        ItemStack primary = ((EnchantingInventory) inventory).getItem(ENCHANTING_ITEM_SLOT);
-        trackedEnchantingItems.put(humanEntity.getUniqueId(), cloneOrNull(primary));
+        if (event.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY && isEnchantable(event.getCurrentItem())) {
 
-    }
-
-    private void updateEnchantingStateNextTick(HumanEntity humanEntity, Inventory inventory) {
-
-        Bukkit.getScheduler().runTask(this, () -> updateEnchantingState(humanEntity, inventory));
-
-    }
-
-    private void updateEnchantingState(HumanEntity humanEntity, Inventory inventory) {
-
-        if (inventory == null || inventory.getType() != InventoryType.ENCHANTING) {
-
-            trackedEnchantingItems.remove(humanEntity.getUniqueId());
-            return;
+            shuffleEnchantingOffers(event.getWhoClicked());
 
         }
 
-        ItemStack primary = ((EnchantingInventory) inventory).getItem(ENCHANTING_ITEM_SLOT);
-        ItemStack previousPrimary = trackedEnchantingItems.get(humanEntity.getUniqueId());
-        ItemStack currentPrimary = cloneOrNull(primary);
+    }
 
-        if (!sameItem(previousPrimary, currentPrimary) && isEnchantable(currentPrimary)) {
+    private void refreshEnchantingOffersIfNeeded(InventoryDragEvent event) {
 
-            humanEntity.setEnchantmentSeed(ThreadLocalRandom.current().nextInt());
+        if (event.getRawSlots().contains(ENCHANTING_ITEM_SLOT)) {
+
+            shuffleEnchantingOffers(event.getWhoClicked());
 
         }
 
-        trackedEnchantingItems.put(humanEntity.getUniqueId(), currentPrimary);
+    }
+
+    private void shuffleEnchantingOffers(HumanEntity humanEntity) {
+
+        humanEntity.setEnchantmentSeed(ThreadLocalRandom.current().nextInt());
 
     }
 
@@ -219,30 +215,6 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
     private boolean isLapis(ItemStack item) {
 
         return item != null && item.getType() == Material.LAPIS_LAZULI;
-
-    }
-
-    private ItemStack cloneOrNull(ItemStack item) {
-
-        if (item == null || item.getType() == Material.AIR) {
-
-            return null;
-
-        }
-
-        return item.clone();
-
-    }
-
-    private boolean sameItem(ItemStack first, ItemStack second) {
-
-        if (first == null || second == null) {
-
-            return first == second;
-
-        }
-
-        return first.equals(second);
 
     }
 
@@ -296,15 +268,14 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
     public void onAnvil(PrepareAnvilEvent event) {
 
         event.getInventory().setMaximumRepairCost(21862);
-        if (event.getInventory().getItem(2) != null) {
 
-            if (event.getInventory().getItem(0).getDisplayName() != event.getInventory().getItem(2).getDisplayName()
-                    && event.getInventory().getItem(1) == null)
-            {
+        final boolean condition = event.getInventory().getItem(2) != null
+                && !event.getInventory().getItem(0).getDisplayName()
+                        .equals(event.getInventory().getItem(2).getDisplayName())
+                && event.getInventory().getItem(1) == null;
+        if (condition) {
 
-                event.getInventory().setMaximumRepairCost(1);
-
-            }
+            event.getInventory().setMaximumRepairCost(1);
 
         }
 
