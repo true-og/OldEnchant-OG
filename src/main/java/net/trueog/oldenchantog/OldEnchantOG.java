@@ -176,7 +176,7 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
 
         if (event.getRawSlot() == ENCHANTING_ITEM_SLOT) {
 
-            shuffleEnchantingOffers(event.getWhoClicked());
+            refreshEnchantingOffersNextTick(event.getWhoClicked());
 
             return;
 
@@ -184,7 +184,7 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
 
         if (event.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY && isEnchantable(event.getCurrentItem())) {
 
-            shuffleEnchantingOffers(event.getWhoClicked());
+            refreshEnchantingOffersNextTick(event.getWhoClicked());
 
         }
 
@@ -194,9 +194,38 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
 
         if (event.getRawSlots().contains(ENCHANTING_ITEM_SLOT)) {
 
-            shuffleEnchantingOffers(event.getWhoClicked());
+            refreshEnchantingOffersNextTick(event.getWhoClicked());
 
         }
+
+    }
+
+    private void refreshEnchantingOffersNextTick(HumanEntity humanEntity) {
+
+        Bukkit.getScheduler().runTask(this, () -> {
+
+            final Inventory inventory = humanEntity.getOpenInventory().getTopInventory();
+            if (inventory.getType() != InventoryType.ENCHANTING) {
+
+                return;
+
+            }
+
+            final EnchantingInventory enchantingInventory = (EnchantingInventory) inventory;
+            final ItemStack item = enchantingInventory.getItem(ENCHANTING_ITEM_SLOT);
+
+            shuffleEnchantingOffers(humanEntity);
+            fillUpEnchantingTable(enchantingInventory);
+
+            if (item != null && item.getType() != Material.AIR) {
+
+                // Re-applying the item forces Bukkit to rebuild the full offer list with the
+                // new seed.
+                enchantingInventory.setItem(ENCHANTING_ITEM_SLOT, item.clone());
+
+            }
+
+        });
 
     }
 
