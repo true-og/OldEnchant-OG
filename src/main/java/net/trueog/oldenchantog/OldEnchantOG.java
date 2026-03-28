@@ -5,10 +5,16 @@
  */
 package net.trueog.oldenchantog;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.enchantments.EnchantmentOffer;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.event.EventHandler;
@@ -40,6 +46,10 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
     private static final int ENCHANTING_LAPIS_SLOT = 1;
     private static final int ENCHANTING_ITEM_SLOT = 0;
     private static final int AUTO_LAPIS_AMOUNT = 64;
+
+    // Per-player storage for 1.7.10-style enchantment offers.
+    private final Map<UUID, int[]> playerCosts = new HashMap<>();
+    private final Map<UUID, List<Map<Enchantment, Integer>>> playerEnchantments = new HashMap<>();
 
     @Override
     public void onEnable() {
@@ -117,6 +127,10 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
 
             ((EnchantingInventory) inventory).setSecondary(null);
 
+            final UUID playerId = event.getPlayer().getUniqueId();
+            playerCosts.remove(playerId);
+            playerEnchantments.remove(playerId);
+
         }
 
     }
@@ -124,13 +138,48 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
     @EventHandler
     public void prepareEnchant(PrepareItemEnchantEvent event) {
 
+        final UUID playerId = event.getEnchanter().getUniqueId();
+        final ItemStack item = event.getItem();
+        final int bookshelves = event.getEnchantmentBonus();
+
+        // Calculate 1.7.10 costs based on bookshelf count.
+        final int[] costs = OldEnchantAlgorithm.calculateCosts(bookshelves);
+        playerCosts.put(playerId, costs);
+
+        // Generate enchantments for each of the 3 slots.
+        final List<Map<Enchantment, Integer>> slotEnchantments = new ArrayList<>(3);
+        for (int i = 0; i < 3; i++) {
+
+            slotEnchantments.add(OldEnchantAlgorithm.selectEnchantments(costs[i], item));
+
+        }
+
+        playerEnchantments.put(playerId, slotEnchantments);
+
+        // Update the enchantment offers displayed to the player.
         final EnchantmentOffer[] offers = event.getOffers();
-        for (int i = 0; i < offers.length; i++) {
+        for (int i = 0; i < 3; i++) {
 
-            final EnchantmentOffer offer = offers[i];
-            if (offer != null) {
+            final Map<Enchantment, Integer> enchants = slotEnchantments.get(i);
+            if (enchants.isEmpty()) {
 
-                offer.setCost(i + 1);
+                offers[i] = null;
+                continue;
+
+            }
+
+            // Use the first enchantment as the clue shown in the UI.
+            final Map.Entry<Enchantment, Integer> clue = enchants.entrySet().iterator().next();
+
+            if (offers[i] != null) {
+
+                offers[i].setEnchantment(clue.getKey());
+                offers[i].setEnchantmentLevel(clue.getValue());
+                offers[i].setCost(costs[i]);
+
+            } else {
+
+                offers[i] = new EnchantmentOffer(clue.getKey(), clue.getValue(), costs[i]);
 
             }
 
@@ -141,7 +190,30 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
     @EventHandler
     public void enchantItem(EnchantItemEvent event) {
 
-        event.setExpLevelCost(event.whichButton() + 1);
+        final UUID playerId = event.getEnchanter().getUniqueId();
+        final int slot = event.whichButton();
+
+        // Apply 1.7.10 XP level cost (player pays the full displayed cost).
+        final int[] costs = playerCosts.get(playerId);
+        if (costs != null && slot < costs.length) {
+
+            event.setExpLevelCost(costs[slot]);
+
+        }
+
+        // Apply the pre-generated 1.7.10 enchantments.
+        final List<Map<Enchantment, Integer>> slotEnchantments = playerEnchantments.get(playerId);
+        if (slotEnchantments != null && slot < slotEnchantments.size()) {
+
+            final Map<Enchantment, Integer> enchants = slotEnchantments.get(slot);
+            if (!enchants.isEmpty()) {
+
+                event.getEnchantsToAdd().clear();
+                event.getEnchantsToAdd().putAll(enchants);
+
+            }
+
+        }
 
         ((EnchantingInventory) event.getInventory()).setSecondary(getLapis());
 
