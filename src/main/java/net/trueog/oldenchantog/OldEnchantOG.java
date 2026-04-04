@@ -5,6 +5,9 @@
  */
 package net.trueog.oldenchantog;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -50,6 +53,17 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
     // Per-player storage for 1.7.10-style enchantment offers.
     private final Map<UUID, int[]> playerCosts = new HashMap<>();
     private final Map<UUID, List<Map<Enchantment, Integer>>> playerEnchantments = new HashMap<>();
+
+    // Reflection handles for syncing the enchantment seed DataSlot to the client.
+    // The client renders galactic text based on the seed in EnchantmentMenu's
+    // DataSlot,
+    // which is NOT updated by HumanEntity.setEnchantmentSeed() alone.
+    private Field nmsContainerField;
+    private Class<?> dataSlotClass;
+    private Method dataSlotSetMethod;
+    private Field enchantSeedField;
+    private boolean reflectionInitialized;
+    private boolean reflectionAvailable;
 
     @Override
     public void onEnable() {
@@ -303,7 +317,109 @@ public class OldEnchantOG extends JavaPlugin implements Listener {
 
     private void shuffleEnchantingOffers(HumanEntity humanEntity) {
 
-        humanEntity.setEnchantmentSeed(ThreadLocalRandom.current().nextInt());
+        final int newSeed = ThreadLocalRandom.current().nextInt();
+        humanEntity.setEnchantmentSeed(newSeed);
+        // Also update the EnchantmentMenu's DataSlot so the client re-renders
+        // the galactic text. Without this, the DataSlot retains the old seed
+        // from when the container was first opened.
+        syncEnchantmentSeedToClient(humanEntity, newSeed);
+
+    }
+
+    private void syncEnchantmentSeedToClient(HumanEntity humanEntity, int seed) {
+
+        if (!ensureReflection(humanEntity)) {
+
+            return;
+
+        }
+
+        try {
+
+            final Object nmsMenu = nmsContainerField.get(humanEntity.getOpenInventory());
+            final Object dataSlot = enchantSeedField.get(nmsMenu);
+            dataSlotSetMethod.invoke(dataSlot, seed);
+
+        } catch (Exception e) {
+
+            getLogger().warning("Failed to sync enchantment seed: " + e.getMessage());
+
+        }
+
+    }
+
+    private boolean ensureReflection(HumanEntity humanEntity) {
+
+        if (reflectionInitialized) {
+
+            return reflectionAvailable;
+
+        }
+
+        try {
+
+            // CraftInventoryView has a "container" field holding the NMS menu.
+            final Object view = humanEntity.getOpenInventory();
+            nmsContainerField = view.getClass().getDeclaredField("container");
+            nmsContainerField.setAccessible(true);
+
+            // DataSlot class (Mojang-mapped name, stable since Spigot 1.17+).
+            dataSlotClass = Class.forName("net.minecraft.world.inventory.DataSlot");
+
+            // Find void set(int) on DataSlot (name is obfuscated, match by signature).
+            for (Method m : dataSlotClass.getDeclaredMethods()) {
+
+                if (!Modifier.isStatic(m.getModifiers()) && m.getParameterCount() == 1
+                        && m.getParameterTypes()[0] == int.class && m.getReturnType() == void.class)
+                {
+
+                    m.setAccessible(true);
+                    dataSlotSetMethod = m;
+                    break;
+
+                }
+
+            }
+
+            if (dataSlotSetMethod == null) {
+
+                throw new NoSuchMethodException("Could not find DataSlot.set(int)");
+
+            }
+
+            // The first DataSlot-typed field on EnchantmentMenu is enchantmentSeed.
+            final Object nmsMenu = nmsContainerField.get(view);
+            for (Field f : nmsMenu.getClass().getDeclaredFields()) {
+
+                if (dataSlotClass.isAssignableFrom(f.getType())) {
+
+                    f.setAccessible(true);
+                    enchantSeedField = f;
+                    break;
+
+                }
+
+            }
+
+            if (enchantSeedField == null) {
+
+                throw new NoSuchFieldException("Could not find DataSlot field on enchantment menu");
+
+            }
+
+            reflectionInitialized = true;
+            reflectionAvailable = true;
+            return true;
+
+        } catch (Exception e) {
+
+            reflectionInitialized = true;
+            reflectionAvailable = false;
+            getLogger().warning("Could not initialize enchantment seed sync: " + e.getMessage());
+            getLogger().warning("Galactic text in the enchanting table will not update when items are touched.");
+            return false;
+
+        }
 
     }
 

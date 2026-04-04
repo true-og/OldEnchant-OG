@@ -70,7 +70,8 @@ public final class OldEnchantAlgorithm {
     }
 
     // Enchantments obtainable from a standard enchanting table, excluding those
-    // irrelevant to 1.8 PvP (e.g. Sweeping Edge, which requires 1.9+ sweep attacks).
+    // irrelevant to 1.8 PvP (e.g. Sweeping Edge, which requires 1.9+ sweep
+    // attacks).
     // Weight, maxLevel, minPower, and maxPower match vanilla values.
     // Newer enchantments (trident, crossbow) use values consistent with the
     // original system's design patterns.
@@ -184,7 +185,8 @@ public final class OldEnchantAlgorithm {
 
     }
 
-     // Calculates three enchantment slot costs using the 1.7.10 formula. Costs scale with bookshelf count (0-15) and range from 1 to 30.
+    // Calculates three enchantment slot costs using the 1.7.10 formula. Costs scale
+    // with bookshelf count (0-15) and range from 1 to 30.
     static int[] calculateCosts(int bookshelves) {
 
         final Random random = ThreadLocalRandom.current();
